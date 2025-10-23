@@ -1,0 +1,90 @@
+# from https://github.com/rust-build/rust-build.action
+# and https://github.com/BamPeers/rust-ci-github-actions-workflow/blob/main/.github/workflows/release-packaging.yaml
+# and https://trstringer.com/github-actions-create-release-upload-artifacts/
+
+# Docs: https://docs.github.com/en/actions/using-workflows/workflow-syntax-for-github-actions
+
+# After release artifact is generated, I should submit it to https://www.microsoft.com/en-us/wdsi/filesubmission to hopefully get rid of the WindowsDefender Message
+
+# TODO: make apple builds not crash and then enable them again.
+
+name: Rust Release Build & Draft
+
+on:
+  # draft a release when pushing a tag
+  push:
+    tags:
+      - "*"
+
+
+jobs:
+  create-release:
+    name: create-release
+    runs-on: ubuntu-latest
+    outputs:
+      upload_url: ${{ steps.release.outputs.upload_url }}
+      version: ${{ env.VERSION }}
+    steps:
+      - name: Get the release version from the tag
+        shell: bash
+        if: env.VERSION == ''
+        run: |
+          # Apparently, this is the right way to get a tag name. Really?
+          #
+          # See: https://github.community/t5/GitHub-Actions/How-to-get-just-the-tag-name/m-p/32167/highlight/true#M1027
+          echo "VERSION=${GITHUB_REF#refs/tags/}" >> $GITHUB_ENV
+          echo "version is: ${{ env.VERSION }}"
+
+      - name: Create GitHub release
+        id: release
+        uses: actions/create-release@v1
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        with:
+          draft: true
+          tag_name: ${{ env.VERSION }}
+          release_name: ${{ env.VERSION }}
+
+  build-release:
+    name: build-release
+    needs: ['create-release']
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        include:
+          - target: x86_64-pc-windows-gnu
+            archive: zip
+          - target: x86_64-unknown-linux-musl
+            archive: tar.gz
+          # - target: x86_64-apple-darwin
+          #   archive: zip
+    steps:
+    - name: Checkout repository
+      id: checkout
+      uses: actions/checkout@v3
+      with: 
+        fetch-depth: 0
+
+    - name: Compile ${{ matrix.target }}
+      id: compile
+      uses: rust-build/rust-build.action@v1.4.5
+      # env:
+      #   GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      with:
+        TOOLCHAIN_VERSION: 1.83.0
+        RUSTTARGET: ${{ matrix.target }}
+        ARCHIVE_TYPES: ${{ matrix.archive }}
+        ARCHIVE_NAME: TurunMap-${{ needs.create-release.outputs.version }}.${{ matrix.archive }}
+        # MINIFY: true
+        UPLOAD_MODE: none
+
+    - name: Upload ${{ matrix.target }} to Release
+      id: upload
+      uses: actions/upload-release-asset@v1
+      env:
+        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      with:
+        upload_url: ${{ needs.create-release.outputs.upload_url }}
+        asset_name: TurunMap-${{ needs.create-release.outputs.version }}-${{ matrix.target }}.${{ matrix.archive }}
+        asset_path: ${{ steps.compile.outputs.BUILT_ARCHIVE }}
+        asset_content_type: application/octet-stream

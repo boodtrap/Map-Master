@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         Grepolis Map (Turunmap) Loader
 // @namespace    https://github.com/Turun/GrepolisMap
-// @version      0.1.1
+// @version      0.1.2
 // @description  Integreert de GrepolisMap (Rust+WASM) als zwevend paneel in Grepolis via een iframe.
 // @author       You
 // @match        https://*.grepolis.com/*
@@ -13,127 +13,43 @@
   'use strict';
 
   // ======== CONFIG ========
-  // Vervang dit met de uiteindelijke gehoste URL van de gebouwde webversie (via trunk build) van GrepolisMap.
-  // Voorbeeld (GitHub Pages): https://<user>.github.io/GrepolisMap/
-  // Voorbeeld (Netlify):      https://<subdomain>.netlify.app/ // <-- Live URL van gehoste webbuild
+  // Set this to the hosted URL of the built web app (Trunk output).
   const HOSTED_APP_URL = 'https://boodtrap.github.io/Map-Master/';
-  // Als je service worker caching wil vermijden, kun je de app openen met hash #dev
+  // When true the loader will add #dev to the app URL to bypass SW caching when you want.
   const USE_DEV_HASH = true;
   // =========================
 
   console.info('[GrepolisMap] loader initializing');
 
   if (!HOSTED_APP_URL) {
-    console.warn('[GrepolisMap] HOSTED_APP_URL is nog niet ingesteld. Pas dit aan in het userscript na het hosten.');
+    console.warn('[GrepolisMap] HOSTED_APP_URL is leeg — pas dit aan in het userscript.');
   }
 
-  // Detecteer wereld/taal van de huidige Grepolis pagina voor context naar de app.
   function detectContext() {
     const { hostname, href } = window.location;
-    // Heuristiek: subdomein kan iets als en123.grepolis.com zijn
-    // Probeer wereldcode uit subdomein te halen
     let world = '';
     const hostParts = hostname.split('.');
-    if (hostParts.length >= 3) {
-      world = hostParts[0];
-    }
-
-    // Taalcode raden (eerste twee letters van subdomein, als het voldoet)
+    if (hostParts.length >= 3) world = hostParts[0];
     let lang = '';
     const langMatch = world.match(/^([a-z]{2})\d+/i);
-    if (langMatch) {
-      lang = langMatch[1].toLowerCase();
-    }
-
+    if (langMatch) lang = langMatch[1].toLowerCase();
     return { world, lang, href };
   }
 
-  // UI injectie: knop + paneel + iframe
   function injectUI() {
-    const existing = document.getElementById('gp-map-toggle');
-    if (existing) return; // al aanwezig
+    if (document.getElementById('gp-map-toggle')) return;
 
     const styles = document.createElement('style');
     styles.textContent = `
-      #gp-map-toggle {
-        position: fixed;
-        bottom: 16px;
-        right: 16px;
-        z-index: 999999;
-        background: #2c7be5;
-        color: #fff;
-        border: none;
-        border-radius: 6px;
-        padding: 10px 12px;
-        font: 600 13px/1 system-ui, -apple-system, Segoe UI, Roboto, Helvetica, Arial, sans-serif;
-        cursor: pointer;
-        box-shadow: 0 6px 16px rgba(0,0,0,0.25);
-      }
-      #gp-map-panel {
-        position: fixed;
-        bottom: 64px;
-        right: 16px;
-        width: min(1000px, 90vw);
-        height: min(700px, 80vh);
-        background: #1f1f1f;
-        border: 1px solid rgba(255,255,255,0.1);
-        border-radius: 10px;
-        overflow: hidden;
-        display: none;
-        z-index: 999998;
-        box-shadow: 0 16px 48px rgba(0,0,0,0.45);
-      }
-      #gp-map-header {
-        height: 36px;
-        background: rgba(0,0,0,0.5);
-        color: #fff;
-        display: flex;
-        align-items: center;
-        justify-content: space-between;
-        padding: 0 10px;
-        user-select: none;
-        cursor: move;
-      }
-      #gp-map-title {
-        font: 600 12px/1 system-ui, -apple-system, Segoe UI, Roboto, Helvetica, Arial, sans-serif;
-        opacity: 0.9;
-      }
-      #gp-map-actions {
-        display: flex;
-        gap: 6px;
-      }
-      .gp-map-btn {
-        background: rgba(255,255,255,0.12);
-        color: #fff;
-        border: 0;
-        border-radius: 6px;
-        padding: 6px 8px;
-        font: 600 12px/1 system-ui, -apple-system, Segoe UI, Roboto, Helvetica, Arial, sans-serif;
-        cursor: pointer;
-      }
-      #gp-map-iframe {
-        width: 100%;
-        height: calc(100% - 36px);
-        border: 0;
-        display: block;
-        background: #404040;
-      }
-      #gp-map-overlay {
-        position: absolute;
-        left: 0;
-        top: 36px;
-        right: 0;
-        bottom: 0;
-        background: rgba(20,20,20,0.9);
-        color: #fff;
-        display: none;
-        align-items: center;
-        justify-content: center;
-        padding: 16px;
-        text-align: center;
-        z-index: 1000000;
-      }
-      #gp-map-overlay a { color: #9fd0ff; text-decoration: underline; }
+      #gp-map-toggle { position: fixed; bottom: 16px; right: 16px; z-index: 999999; background:#2c7be5; color:#fff; border:0; border-radius:6px; padding:10px 12px; font:600 13px/1 system-ui,Segoe UI,Roboto,Arial; cursor:pointer; box-shadow:0 6px 16px rgba(0,0,0,0.25); }
+      #gp-map-panel { position: fixed; bottom:64px; right:16px; width: min(1000px,90vw); height: min(700px,80vh); background:#1f1f1f; border:1px solid rgba(255,255,255,0.1); border-radius:10px; overflow:hidden; display:none; z-index:999998; box-shadow:0 16px 48px rgba(0,0,0,0.45); }
+      #gp-map-header { height:36px; background:rgba(0,0,0,0.5); color:#fff; display:flex; align-items:center; justify-content:space-between; padding:0 10px; user-select:none; cursor:move; }
+      #gp-map-title { font:600 12px system-ui,Segoe UI,Roboto,Arial; opacity:0.9; }
+      #gp-map-actions { display:flex; gap:6px; }
+      .gp-map-btn { background:rgba(255,255,255,0.12); color:#fff; border:0; border-radius:6px; padding:6px 8px; font:600 12px system-ui,Segoe UI,Roboto,Arial; cursor:pointer; }
+      #gp-map-iframe { width:100%; height:calc(100% - 36px); border:0; display:block; background:#404040; }
+      #gp-map-overlay { position:absolute; left:0; top:36px; right:0; bottom:0; background:rgba(20,20,20,0.9); color:#fff; display:none; align-items:center; justify-content:center; padding:16px; text-align:center; z-index:1000000; }
+      #gp-map-overlay a { color:#9fd0ff; text-decoration:underline; }
     `;
     document.head.appendChild(styles);
 
@@ -164,7 +80,7 @@
 
     const iframe = document.createElement('iframe');
     iframe.id = 'gp-map-iframe';
-    // NOTE: removed sandbox attribute to avoid extra restrictions during debugging and to ensure features work
+    // NOTE: intentionally not using sandbox here to avoid extra restrictions while debugging
 
     const overlay = document.createElement('div');
     overlay.id = 'gp-map-overlay';
@@ -183,7 +99,6 @@
 
     function buildAppUrl() {
       const ctx = detectContext();
-      // Support both absolute and relative host URLs
       let url;
       try {
         url = new URL(HOSTED_APP_URL);
@@ -191,7 +106,6 @@
         url = new URL(HOSTED_APP_URL, window.location.origin);
       }
       if (USE_DEV_HASH) url.hash = 'dev';
-      // Geef context mee als query parameters. De app kan (optioneel) deze lezen via JS.
       url.searchParams.set('world', ctx.world);
       url.searchParams.set('lang', ctx.lang);
       url.searchParams.set('from', 'tampermonkey');
@@ -209,22 +123,42 @@
 
     function openPanel() {
       hideOverlay();
-      iframe.src = buildAppUrl();
-      panel.style.display = 'block';
-      saveOpenState(true);
+      try {
+        iframe.src = buildAppUrl();
+        panel.style.display = 'block';
+        saveOpenState(true);
+        // If iframe doesn't fire load within X seconds, show helpful overlay (embedding blocked / network issue)
+        const failTimer = setTimeout(() => {
+          if (!iframe.contentWindow) {
+            const safeUrl = buildAppUrl();
+            showOverlay(
+              '<div><strong>Map could not be embedded.</strong><br><br>' +
+              'This page cannot show the hosted map inside an iframe (CSP / X-Frame-Options or network issue).<br><br>' +
+              `Open the map in a new tab: <a href="${safeUrl}" target="_blank" rel="noopener noreferrer">Open Map</a></div>`
+            );
+          }
+        }, 4000);
+        iframe.addEventListener('load', function onLoad() {
+          clearTimeout(failTimer);
+          iframe.removeEventListener('load', onLoad);
+          hideOverlay();
+          console.info('[GrepolisMap] iframe loaded.');
+        });
+      } catch (err) {
+        console.error('[GrepolisMap] openPanel error', err);
+        showOverlay('<div><strong>Failed to set iframe.src</strong><br>' + String(err) + '</div>');
+      }
     }
 
     function closePanel() {
       panel.style.display = 'none';
+      // avoid keeping src loaded when closed to reduce memory
+      try { iframe.src = 'about:blank'; } catch (e) {}
       saveOpenState(false);
     }
 
     toggleBtn.addEventListener('click', () => {
-      if (panel.style.display === 'none' || panel.style.display === '') {
-        openPanel();
-      } else {
-        closePanel();
-      }
+      if (panel.style.display === 'none' || panel.style.display === '') openPanel(); else closePanel();
     });
 
     popoutBtn.addEventListener('click', () => {
@@ -233,27 +167,19 @@
 
     closeBtn.addEventListener('click', () => closePanel());
 
-    // iframe load: accept cross-origin, no need to access content
-    iframe.addEventListener('load', () => {
-      hideOverlay();
-      console.info('[GrepolisMap] iframe loaded.');
-    });
-
     iframe.addEventListener('error', (e) => {
       console.error('[GrepolisMap] iframe error loading:', e);
       const safeUrl = buildAppUrl();
       showOverlay(
-        '<div>' +
-          '<strong>Failed to load map.</strong><br><br>' +
-          'There was an error loading the hosted map. Open in a new tab to continue:<br>' +
-          ` <a href="${safeUrl}" target="_blank" rel="noopener noreferrer">Open Map</a>` +
-        '</div>'
+        '<div><strong>Failed to load map.</strong><br><br>' +
+        'There was an error loading the hosted map. Open in a new tab to continue:<br>' +
+        ` <a href="${safeUrl}" target="_blank" rel="noopener noreferrer">Open Map</a></div>`
       );
     });
 
-    // Drag verplaatsing en opslag positie
     makeDraggable(panel, header);
-    restorePanelState(panel, iframe);
+    // restorePanelState will set iframe.src if open flag was saved
+    restorePanelState(panel, iframe, openPanel);
   }
 
   function makeDraggable(panel, handle) {
@@ -296,13 +222,15 @@
   }
 
   function savePanelPos(panel) {
-    const rect = panel.getBoundingClientRect();
-    const pos = { left: rect.left, top: rect.top };
-    localStorage.setItem('gp-map-pos', JSON.stringify(pos));
+    try {
+      const rect = panel.getBoundingClientRect();
+      const pos = { left: rect.left, top: rect.top };
+      localStorage.setItem('gp-map-pos', JSON.stringify(pos));
+    } catch (e) { /* ignore */ }
   }
 
-  // Accept iframe so we can set src when restoring open state
-  function restorePanelState(panel, iframe) {
+  // restorePanelState: if open flag is set, call provided openPanel function so iframe.src is set reliably
+  function restorePanelState(panel, iframe, openPanelFn) {
     const saved = localStorage.getItem('gp-map-pos');
     if (saved) {
       try {
@@ -316,57 +244,33 @@
     }
     const open = localStorage.getItem('gp-map-open');
     if (open === '1') {
-      // Set iframe src so it actually loads when restoring state
-      try {
-        if (iframe) {
-          iframe.src = (function () {
-            try {
-              // Try absolute URL first
-              let url = new URL(HOSTED_APP_URL);
-              if (USE_DEV_HASH) url.hash = 'dev';
-              const { world, lang } = detectContext();
-              url.searchParams.set('world', world);
-              url.searchParams.set('lang', lang);
-              url.searchParams.set('from', 'tampermonkey');
-              return url.toString();
-            } catch (e) {
-              // Fallback: support relative URL base
-              let url;
-              try {
-                url = new URL(HOSTED_APP_URL);
-              } catch (err) {
-                url = new URL(HOSTED_APP_URL, window.location.origin);
-              }
-              if (USE_DEV_HASH) url.hash = 'dev';
-              const ctx = detectContext();
-              url.searchParams.set('world', ctx.world);
-              url.searchParams.set('lang', ctx.lang);
-              url.searchParams.set('from', 'tampermonkey');
-              return url.toString();
-            }
-          })();
-          // fallback: if building above failed, call build via known pattern
-        }
-      } catch (e) {
-        // ignore - best-effort
+      if (typeof openPanelFn === 'function') {
+        // call the same open routine to ensure src + diagnostics run
+        openPanelFn();
+      } else {
+        // fallback: set src directly
+        try {
+          let ctx = detectContext();
+          let url;
+          try { url = new URL(HOSTED_APP_URL); } catch (e) { url = new URL(HOSTED_APP_URL, window.location.origin); }
+          if (USE_DEV_HASH) url.hash = 'dev';
+          url.searchParams.set('world', ctx.world);
+          url.searchParams.set('lang', ctx.lang);
+          url.searchParams.set('from', 'tampermonkey');
+          iframe.src = url.toString();
+        } catch (e) { console.warn('[GrepolisMap] restore fallback failed', e); }
       }
       panel.style.display = 'block';
     }
   }
 
   function saveOpenState(isOpen) {
-    localStorage.setItem('gp-map-open', isOpen ? '1' : '0');
+    try { localStorage.setItem('gp-map-open', isOpen ? '1' : '0'); } catch (e) { /* ignore */ }
   }
 
   function ready(fn) {
-    if (document.readyState === 'loading') {
-      document.addEventListener('DOMContentLoaded', fn);
-    } else {
-      fn();
-    }
+    if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', fn); else fn();
   }
 
-  ready(() => {
-    injectUI();
-  });
+  ready(() => injectUI());
 })();

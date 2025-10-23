@@ -13,11 +13,8 @@
   'use strict';
 
   // ======== CONFIG ========
-  // Vervang dit met de uiteindelijke gehoste URL van de gebouwde webversie (via trunk build) van GrepolisMap.
-  // Voorbeeld (GitHub Pages): https://<user>.github.io/GrepolisMap/
-  // Voorbeeld (Netlify):      https://<subdomain>.netlify.app/
-  const HOSTED_APP_URL = 'https://github.com/boodtrap/Map-Master/'; // <-- Live URL van gehoste webbuild
-
+ 
+  const HOSTED_APP_URL = 'https://github.com/boodtrap/Map-Master/'; 
   // Als je service worker caching wil vermijden, kun je de app openen met hash #dev
   const USE_DEV_HASH = true;
 

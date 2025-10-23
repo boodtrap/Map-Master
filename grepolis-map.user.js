@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         Grepolis Map (Turunmap) Loader
 // @namespace    https://github.com/Turun/GrepolisMap
-// @version      0.1.0
+// @version      0.1.1
 // @description  Integreert de GrepolisMap (Rust+WASM) als zwevend paneel in Grepolis via een iframe.
 // @author       You
 // @match        https://*.grepolis.com/*
@@ -15,15 +15,15 @@
   // ======== CONFIG ========
   // Vervang dit met de uiteindelijke gehoste URL van de gebouwde webversie (via trunk build) van GrepolisMap.
   // Voorbeeld (GitHub Pages): https://<user>.github.io/GrepolisMap/
-  // Voorbeeld (Netlify):      https://<subdomain>.netlify.app/
-  const HOSTED_APP_URL = 'https://boodtrap.github.io/Map-Master/'; // <-- Live URL van gehoste webbuild
-
+  // Voorbeeld (Netlify):      https://<subdomain>.netlify.app/ // <-- Live URL van gehoste webbuild
+  const HOSTED_APP_URL = 'https://boodtrap.github.io/Map-Master/';
   // Als je service worker caching wil vermijden, kun je de app openen met hash #dev
   const USE_DEV_HASH = true;
-
   // =========================
 
-  if (!HOSTED_APP_URL || HOSTED_APP_URL === 'https://boodtrap.github.io/Map-Master/') {
+  console.info('[GrepolisMap] loader initializing');
+
+  if (!HOSTED_APP_URL) {
     console.warn('[GrepolisMap] HOSTED_APP_URL is nog niet ingesteld. Pas dit aan in het userscript na het hosten.');
   }
 
@@ -118,6 +118,22 @@
         display: block;
         background: #404040;
       }
+      #gp-map-overlay {
+        position: absolute;
+        left: 0;
+        top: 36px;
+        right: 0;
+        bottom: 0;
+        background: rgba(20,20,20,0.9);
+        color: #fff;
+        display: none;
+        align-items: center;
+        justify-content: center;
+        padding: 16px;
+        text-align: center;
+        z-index: 1000000;
+      }
+      #gp-map-overlay a { color: #9fd0ff; text-decoration: underline; }
     `;
     document.head.appendChild(styles);
 
@@ -148,6 +164,10 @@
 
     const iframe = document.createElement('iframe');
     iframe.id = 'gp-map-iframe';
+    // NOTE: removed sandbox attribute to avoid extra restrictions during debugging and to ensure features work
+
+    const overlay = document.createElement('div');
+    overlay.id = 'gp-map-overlay';
 
     header.appendChild(title);
     actions.appendChild(popoutBtn);
@@ -156,13 +176,20 @@
 
     panel.appendChild(header);
     panel.appendChild(iframe);
+    panel.appendChild(overlay);
 
     document.body.appendChild(panel);
     document.body.appendChild(toggleBtn);
 
     function buildAppUrl() {
       const ctx = detectContext();
-      const url = new URL(HOSTED_APP_URL, window.location.origin);
+      // Support both absolute and relative host URLs
+      let url;
+      try {
+        url = new URL(HOSTED_APP_URL);
+      } catch (e) {
+        url = new URL(HOSTED_APP_URL, window.location.origin);
+      }
       if (USE_DEV_HASH) url.hash = 'dev';
       // Geef context mee als query parameters. De app kan (optioneel) deze lezen via JS.
       url.searchParams.set('world', ctx.world);
@@ -171,7 +198,17 @@
       return url.toString();
     }
 
+    function showOverlay(html) {
+      overlay.innerHTML = html;
+      overlay.style.display = 'flex';
+    }
+    function hideOverlay() {
+      overlay.style.display = 'none';
+      overlay.innerHTML = '';
+    }
+
     function openPanel() {
+      hideOverlay();
       iframe.src = buildAppUrl();
       panel.style.display = 'block';
       saveOpenState(true);
@@ -196,9 +233,27 @@
 
     closeBtn.addEventListener('click', () => closePanel());
 
+    // iframe load: accept cross-origin, no need to access content
+    iframe.addEventListener('load', () => {
+      hideOverlay();
+      console.info('[GrepolisMap] iframe loaded.');
+    });
+
+    iframe.addEventListener('error', (e) => {
+      console.error('[GrepolisMap] iframe error loading:', e);
+      const safeUrl = buildAppUrl();
+      showOverlay(
+        '<div>' +
+          '<strong>Failed to load map.</strong><br><br>' +
+          'There was an error loading the hosted map. Open in a new tab to continue:<br>' +
+          ` <a href="${safeUrl}" target="_blank" rel="noopener noreferrer">Open Map</a>` +
+        '</div>'
+      );
+    });
+
     // Drag verplaatsing en opslag positie
     makeDraggable(panel, header);
-    restorePanelState(panel);
+    restorePanelState(panel, iframe);
   }
 
   function makeDraggable(panel, handle) {
@@ -246,7 +301,8 @@
     localStorage.setItem('gp-map-pos', JSON.stringify(pos));
   }
 
-  function restorePanelState(panel) {
+  // Accept iframe so we can set src when restoring open state
+  function restorePanelState(panel, iframe) {
     const saved = localStorage.getItem('gp-map-pos');
     if (saved) {
       try {
@@ -256,11 +312,44 @@
         panel.style.right = 'auto';
         panel.style.bottom = 'auto';
         panel.style.position = 'fixed';
-      } catch (error) {}
+      } catch (error) { /* ignore */ }
     }
     const open = localStorage.getItem('gp-map-open');
     if (open === '1') {
-      // iframe src wordt gezet in openPanel()
+      // Set iframe src so it actually loads when restoring state
+      try {
+        if (iframe) {
+          iframe.src = (function () {
+            try {
+              // Try absolute URL first
+              let url = new URL(HOSTED_APP_URL);
+              if (USE_DEV_HASH) url.hash = 'dev';
+              const { world, lang } = detectContext();
+              url.searchParams.set('world', world);
+              url.searchParams.set('lang', lang);
+              url.searchParams.set('from', 'tampermonkey');
+              return url.toString();
+            } catch (e) {
+              // Fallback: support relative URL base
+              let url;
+              try {
+                url = new URL(HOSTED_APP_URL);
+              } catch (err) {
+                url = new URL(HOSTED_APP_URL, window.location.origin);
+              }
+              if (USE_DEV_HASH) url.hash = 'dev';
+              const ctx = detectContext();
+              url.searchParams.set('world', ctx.world);
+              url.searchParams.set('lang', ctx.lang);
+              url.searchParams.set('from', 'tampermonkey');
+              return url.toString();
+            }
+          })();
+          // fallback: if building above failed, call build via known pattern
+        }
+      } catch (e) {
+        // ignore - best-effort
+      }
       panel.style.display = 'block';
     }
   }

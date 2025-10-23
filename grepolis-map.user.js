@@ -1,4 +1,4 @@
-// ==UserScript==// ==UserScript==
+// ==UserScript==
 // @name         Grepolis Map (Turunmap) Loader
 // @namespace    https://github.com/Turun/GrepolisMap
 // @version      0.1.0
@@ -13,14 +13,17 @@
   'use strict';
 
   // ======== CONFIG ========
- 
-  const HOSTED_APP_URL = 'https://github.com/boodtrap/Map-Master/'; 
+  // Vervang dit met de uiteindelijke gehoste URL van de gebouwde webversie (via trunk build) van GrepolisMap.
+  // Voorbeeld (GitHub Pages): https://<user>.github.io/GrepolisMap/
+  // Voorbeeld (Netlify):      https://<subdomain>.netlify.app/
+  const HOSTED_APP_URL = 'https://github.com/boodtrap/Map-Master/tree/gh-pages'; // <-- Live URL van gehoste webbuild
+
   // Als je service worker caching wil vermijden, kun je de app openen met hash #dev
   const USE_DEV_HASH = true;
 
   // =========================
 
-  if (!HOSTED_APP_URL || HOSTED_APP_URL === 'https://github.com/boodtrap/Map-Master/') {
+  if (!HOSTED_APP_URL || HOSTED_APP_URL === 'https://github.com/boodtrap/Map-Master/tree/gh-pages/') {
     console.warn('[GrepolisMap] HOSTED_APP_URL is nog niet ingesteld. Pas dit aan in het userscript na het hosten.');
   }
 

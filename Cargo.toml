@@ -31,7 +31,11 @@ base64 = "0.22.1"
 web-sys = { version = "0.3", features = [
     "History",
     "UrlSearchParams",
-    # access to the dom to hide the loading text and access to the current url 
+    "Window",
+    "Document",
+    "Element",
+    "HtmlCanvasElement",
+    "console",
 ] }
 wasm-bindgen = "0.2.99"
 log = "0.4"

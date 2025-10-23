@@ -1,0 +1,45 @@
+_version: 1
+
+menu:
+  open:
+    title: "Open Saved Data"
+  delete:
+    title: "Delete Saved Data"
+    all: "Delete All"
+    confirm: "Yes, delete all saved data"
+
+  preferences:
+    title: "Preferences"
+    darkmode: "Darkmode"
+    follow_system_theme: "Follow System Theme (Restart Required)"
+    lightmode: "Lightmode"
+
+    no_cache: "No Cache"
+    normal_cache: "Normal Cache"
+    large_cache: "Large Cache"
+
+    telemetry_all: "Enable Telemetry"
+    telemetry_version_check: "Only check for new versions"
+    telemetry_nothing: "Disable Telemetry"
+
+    reset: "Reset Preferences"
+
+  import:
+    title: "Import Selections"
+    from_clipboard: "From Clipboard"
+    from_file: "From File(s)"
+
+  export:
+    title: "Export Selections"
+    to_clipboard: "To Clipboard"
+    to_file: "To File"
+    
+  update_notice:
+    title:
+      "New Version Available"
+    content:
+      "Your Version: %{user_version} -> Latest Version: %{server_version}\n\
+      %{message}\n\
+      You can get the latest version here:\n\
+      https://github.com/Turun/GrepolisMap/releases/latest\n\
+      For questions, feedback and bug reports message \"erstes\" on the Grepolis Forum or in Game"

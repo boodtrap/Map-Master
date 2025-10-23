@@ -16,14 +16,14 @@
   // Vervang dit met de uiteindelijke gehoste URL van de gebouwde webversie (via trunk build) van GrepolisMap.
   // Voorbeeld (GitHub Pages): https://<user>.github.io/GrepolisMap/
   // Voorbeeld (Netlify):      https://<subdomain>.netlify.app/
-  const HOSTED_APP_URL = 'https://example.com/'; // <-- TODO: aanpassen na publicatie
+  const HOSTED_APP_URL = 'https://boodtrap.github.io/Map-Master/'; // <-- Live URL van gehoste webbuild
 
   // Als je service worker caching wil vermijden, kun je de app openen met hash #dev
   const USE_DEV_HASH = true;
 
   // =========================
 
-  if (!HOSTED_APP_URL || HOSTED_APP_URL === 'https://example.com/') {
+  if (!HOSTED_APP_URL || HOSTED_APP_URL === 'https://boodtrap.github.io/Map-Master/'') {
     console.warn('[GrepolisMap] HOSTED_APP_URL is nog niet ingesteld. Pas dit aan in het userscript na het hosten.');
   }
 
